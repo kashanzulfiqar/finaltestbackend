@@ -1,0 +1,102 @@
+{
+    "taskDefinitionArn": "arn:aws:ecs:eu-north-1:721717798579:task-definition/my-app-task-def:1",
+    "containerDefinitions": [
+        {
+            "name": "frontend",
+            "image": "kashan1234/reactfrontendimg:latest",
+            "cpu": 512,
+            "memory": 1024,
+            "portMappings": [
+                {
+                    "containerPort": 5173,
+                    "hostPort": 5173,
+                    "protocol": "tcp",
+                    "name": "frontend-5173-tcp",
+                    "appProtocol": "http"
+                }
+            ],
+            "essential": true,
+            "environment": [],
+            "environmentFiles": [],
+            "mountPoints": [],
+            "volumesFrom": [],
+            "ulimits": [],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/my-app-task-def",
+                    "awslogs-create-group": "true",
+                    "awslogs-region": "eu-north-1",
+                    "awslogs-stream-prefix": "ecs"
+                },
+                "secretOptions": []
+            },
+            "systemControls": []
+        },
+        {
+            "name": "backend",
+            "image": "kashan1234/nodebackendimg",
+            "cpu": 512,
+            "memory": 1024,
+            "portMappings": [
+                {
+                    "containerPort": 5000,
+                    "hostPort": 5000,
+                    "protocol": "tcp",
+                    "name": "backend-5000-tcp"
+                }
+            ],
+            "essential": false,
+            "environment": [],
+            "environmentFiles": [],
+            "mountPoints": [],
+            "volumesFrom": [],
+            "systemControls": []
+        }
+    ],
+    "family": "my-app-task-def",
+    "executionRoleArn": "arn:aws:iam::721717798579:role/ecsTaskExecutionRole",
+    "networkMode": "awsvpc",
+    "revision": 1,
+    "volumes": [],
+    "status": "ACTIVE",
+    "requiresAttributes": [
+        {
+            "name": "com.amazonaws.ecs.capability.logging-driver.awslogs"
+        },
+        {
+            "name": "ecs.capability.execution-role-awslogs"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.19"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.18"
+        },
+        {
+            "name": "ecs.capability.task-eni"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.29"
+        }
+    ],
+    "placementConstraints": [],
+    "compatibilities": [
+        "EC2",
+        "FARGATE",
+        "MANAGED_INSTANCES"
+    ],
+    "runtimePlatform": {
+        "cpuArchitecture": "X86_64",
+        "operatingSystemFamily": "LINUX"
+    },
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "cpu": "1024",
+    "memory": "3072",
+    "registeredAt": "2026-07-20T09:21:00.683Z",
+    "registeredBy": "arn:aws:iam::721717798579:root",
+    "enableFaultInjection": false,
+    "tags": []
+}

@@ -1,0 +1,238 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # 1. NEW BACKEND APPLICATION
+  # ==========================================
+  backend:
+    build: ./daftarpro-web-backend
+    container_name: daftarpro-backend
+    restart: always
+    ports:
+      - "3001:3001"
+    env_file:
+      - ./daftarpro-web-backend/.env
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
+    networks:
+      - app-net
+    logging:
+      driver: "loki"
+      options:
+        loki-url: "http://localhost:3100/loki/api/v1/push"
+        loki-batch-size: "400"
+        mode: "non-blocking"
+        max-buffer-size: "4m"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # ==========================================
+  # 2. REDIS DATABASE
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: daftarpro-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+        reservations:
+          cpus: '0.10'
+          memory: 64M
+
+  # ==========================================
+  # 3. DOCKER STATS EXPORTER
+  # ==========================================
+  docker-stats:
+    image: wywywywy/docker_stats_exporter:latest
+    container_name: docker-stats
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "9487:9487"
+    networks:
+      - app-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 64M
+        reservations:
+          cpus: '0.05'
+          memory: 16M
+
+  # ==========================================
+  # 4. NODE EXPORTER
+  # ==========================================
+  node-exporter:
+    image: prom/node-exporter:v1.6.1
+    container_name: node-exporter
+    restart: always
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+    ports:
+      - "9100:9100"
+    networks:
+      - app-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 64M
+        reservations:
+          cpus: '0.05'
+          memory: 16M
+
+  # ==========================================
+  # 5. PROMETHEUS
+  # ==========================================
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: prometheus
+    restart: always
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+    volumes:
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+    depends_on:
+      - docker-stats
+      - node-exporter
+    networks:
+      - app-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+
+  # ==========================================
+  # 6. GRAFANA
+  # ==========================================
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    configs:
+      - source: grafana_datasource
+        target: /etc/grafana/provisioning/datasources/prometheus.yaml
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - app-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+        reservations:
+          cpus: '0.10'
+          memory: 64M
+
+  # ==========================================
+  # 7. LOKI
+  # ==========================================
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki-config.yaml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: always
+    networks:
+      - app-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 350M
+        reservations:
+          cpus: '0.10'
+          memory: 100M
+
+networks:
+  app-net:
+    driver: bridge
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  redis_data:
+
+# ==========================================
+# INLINE CONFIGURATIONS
+# ==========================================
+configs:
+  prometheus_config:
+    content: |
+      global:
+        scrape_interval: 15s
+        evaluation_interval: 15s
+
+      scrape_configs:
+        - job_name: 'docker-stats'
+          static_configs:
+            - targets: ['docker-stats:9487']
+
+        - job_name: 'node-exporter'
+          static_configs:
+            - targets: ['node-exporter:9100']
+
+  grafana_datasource:
+    content: |
+      apiVersion: 1
+
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          access: proxy
+          url: http://prometheus:9090
+          isDefault: true
+          editable: false
+
+        - name: Loki
+          type: loki
+          access: proxy
+          url: http://loki:3100
+          isDefault: false
+          editable: false
