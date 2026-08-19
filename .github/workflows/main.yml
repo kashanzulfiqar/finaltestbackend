@@ -1,0 +1,41 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [ main1 ]
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy Backend to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.STAGING_EC2_IP }}
+          username: ubuntu
+          key: ${{ secrets.KEYFOREC2 }}
+          script: |
+            set -e
+            echo "🚀 Deploying Backend to EC2..."
+            
+            # Ensure app directory exists
+            mkdir -p $HOME/app
+            cd $HOME/app
+
+            # Pull or clone the latest code (or you can use SCP/Docker build steps here)
+            # Alternatively, since runner clones it, you can sync files or pull from your backend repo directly:
+            # git pull origin main (if repo is cloned there)
+            cat << 'EOF' > .env
+            PORT=3001
+            DB_URL=${{ secrets.DB_URL }}
+            DB_NAME=${{ secrets.DB_NAME }}
+            NODE_ENV=production
+            ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}
+            EOF
+
+            echo "📦 Restarting Docker Containers..."
+            sudo docker compose down
+            sudo docker compose up -d --build --force-recreate
