@@ -16,7 +16,7 @@ jobs:
         with:
           host: ${{ secrets.STAGING_EC2_IP }}
           username: ubuntu
-          key: ${{ secrets.KEYFOREC2 }}
+          key: ${{ secrets.devgate-staging }}
           script: |
             set -e
             echo "🚀 Deploying Backend to EC2..."
